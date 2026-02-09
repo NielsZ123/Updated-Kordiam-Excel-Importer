@@ -136,6 +136,50 @@ def get_excel_headers(uploaded_file):
     return [str(c) for c in df.columns]
 
 
+def _col_index_to_letter(index: int) -> str:
+    """Convert zero-based column index to Excel letter (0->A, 25->Z, 26->AA)."""
+    letters = ""
+    while index >= 0:
+        letters = chr(ord('A') + (index % 26)) + letters
+        index = index // 26 - 1
+    return letters
+
+
+def excel_columns_with_first_value(uploaded_file):
+    """Return list of tuples (original_header, display_string) where display_string
+    contains the Excel column letter and the first row value for that column.
+    """
+    if not uploaded_file:
+        return []
+    data = uploaded_file.getvalue()
+    # Read first row to extract first-values; if file is empty this will be empty
+    df = pd.read_excel(io.BytesIO(data), nrows=1)
+    cols = []
+    for idx, col in enumerate(df.columns):
+        try:
+            if df.empty:
+                first_val = ""
+            else:
+                first_val = df.iloc[0][col]
+        except Exception:
+            first_val = ""
+
+        # Normalize first value to a short string
+        try:
+            if pd.isna(first_val):
+                first_str = ""
+            else:
+                first_str = str(first_val)
+        except Exception:
+            first_str = str(first_val)
+
+        letter = _col_index_to_letter(idx)
+        display = f"{letter} — {col} (first: {first_str})"
+        cols.append((col, display))
+
+    return cols
+
+
 def build_mapping_from_selections(selections):
     mapping_config = {
         "element_fields": {},
@@ -279,10 +323,14 @@ if mapping_source == "Build from Excel columns":
         st.info("Upload an Excel file to load column headers.")
     else:
         try:
-            headers = get_excel_headers(excel_file)
-            if not headers:
+            cols = excel_columns_with_first_value(excel_file)
+            if not cols:
                 st.warning("No columns detected in Excel file.")
             else:
+                # cols is a list of (original_header, display_string)
+                display_options = [d for _, d in cols]
+                display_to_original = {d: h for h, d in cols}
+
                 selections = {}
 
                 st.subheader("IDs")
@@ -291,11 +339,12 @@ if mapping_source == "Build from Excel columns":
                         continue
                     key = (section, kordiam_field)
                     display = f"[{section}] {label}"
-                    selections[key] = st.selectbox(
+                    chosen = st.selectbox(
                         display,
-                        ["(none)"] + headers,
+                        ["(none)"] + display_options,
                         key=f"id_{section}_{kordiam_field}"
                     )
+                    selections[key] = display_to_original.get(chosen, "(none)")
 
                 st.subheader("Dates/Times")
                 for section, label, kordiam_field, field_type in FIELD_DEFINITIONS:
@@ -303,11 +352,12 @@ if mapping_source == "Build from Excel columns":
                         continue
                     key = (section, kordiam_field)
                     display = f"[{section}] {label}"
-                    selections[key] = st.selectbox(
+                    chosen = st.selectbox(
                         display,
-                        ["(none)"] + headers,
+                        ["(none)"] + display_options,
                         key=f"dt_{section}_{kordiam_field}"
                     )
+                    selections[key] = display_to_original.get(chosen, "(none)")
 
                 st.subheader("Text/Other")
                 for section, label, kordiam_field, field_type in FIELD_DEFINITIONS:
@@ -315,11 +365,12 @@ if mapping_source == "Build from Excel columns":
                         continue
                     key = (section, kordiam_field)
                     display = f"[{section}] {label}"
-                    selections[key] = st.selectbox(
+                    chosen = st.selectbox(
                         display,
-                        ["(none)"] + headers,
+                        ["(none)"] + display_options,
                         key=f"text_{section}_{kordiam_field}"
                     )
+                    selections[key] = display_to_original.get(chosen, "(none)")
 
                 mapping_config = build_mapping_from_selections(selections)
                 st.session_state["built_mapping_config"] = mapping_config
