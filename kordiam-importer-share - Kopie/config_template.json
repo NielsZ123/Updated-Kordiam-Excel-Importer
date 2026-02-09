@@ -1,0 +1,7 @@
+{
+  "base_url": "https://kordiam.app",
+  "client_id": "api_XXXXX",
+  "client_secret": "XXXXXXXXXXXXXX",
+  "token_endpoint": "/api/token",
+  "timeout": 30
+} 
