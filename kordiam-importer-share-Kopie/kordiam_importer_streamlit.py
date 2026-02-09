@@ -317,7 +317,7 @@ st.text_area("Logs", st.session_state.logs, height=300)
 
 # --- Mapping Builder UI ---
 if mapping_source == "Build from Excel columns":
-    st.header("ðŸ§­ Field Mapping Builder")
+    st.header("🧭 Field Mapping Builder")
 
     if not excel_file:
         st.info("Upload an Excel file to load column headers.")
